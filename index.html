@@ -1,37 +1,44 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>wizardmanhelper</title>
+  <meta charset="UTF-8">
+  <title>Auto Quad Link</title>
   <style>
-    body { font-family: sans-serif; text-align: center; background: #f7f7f7; }
+    body { font-family: sans-serif; background: #f2f2f2; text-align: center; }
     #board {
       display: grid;
       grid-template-columns: repeat(7, 60px);
       grid-template-rows: repeat(6, 60px);
       gap: 4px;
       justify-content: center;
-      margin-top: 20px;
+      margin: 20px auto;
     }
     .cell {
-      width: 60px; height: 60px;
-      background: white; border-radius: 50%; border: 2px solid #333;
+      width: 60px;
+      height: 60px;
+      background: white;
+      border: 2px solid #333;
+      border-radius: 50%;
     }
     .ai { background: gold; }
-    #result { margin-top: 20px; font-size: 1.2em; color: #222; }
+    .player { background: dodgerblue; }
+    #result { font-size: 1.2em; margin-top: 20px; }
+    button { padding: 10px 20px; font-size: 1em; margin-top: 10px; }
   </style>
 </head>
 <body>
 
-<h2>wizardmanhelper</h2>
+<h2>Auto Quad Link</h2>
+<p>点击棋盘输入 AI 的第一步，AI 将自动模拟整局。</p>
 <div id="board"></div>
 <div id="result"></div>
 
 <script>
-  const ROWS = 6, COLS = 7, AI = 2;
+  const ROWS = 6, COLS = 7;
+  const AI = 2, PLAYER = 1;
   let board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
   let aiStepPlaced = false;
+  let currentTurn = PLAYER;
 
   const boardDiv = document.getElementById('board');
   const resultDiv = document.getElementById('result');
@@ -43,10 +50,16 @@
         const cell = document.createElement('div');
         cell.classList.add('cell');
         if (board[r][c] === AI) cell.classList.add('ai');
+        else if (board[r][c] === PLAYER) cell.classList.add('player');
         cell.dataset.row = r;
         cell.dataset.col = c;
         cell.addEventListener('click', () => {
-          if (!aiStepPlaced) placeAIColumn(c);
+          if (!aiStepPlaced) {
+            placePiece(c, AI);
+            aiStepPlaced = true;
+            renderBoard();
+            setTimeout(playLoop, 500);
+          }
         });
         boardDiv.appendChild(cell);
       }
@@ -60,86 +73,70 @@
     return -1;
   }
 
-  function placeAIColumn(col) {
+  function placePiece(col, player) {
     const row = getAvailableRow(col);
-    if (row === -1) return;
-    board[row][col] = AI;
-    aiStepPlaced = true;
-    renderBoard();
-    const nextMove = getBestMove();
-    resultDiv.textContent = `✅ 推荐下一步落子列: 第 ${nextMove + 1} 列`;
-  }
-
-  function getValidLocations() {
-    return [...Array(COLS).keys()].filter(c => board[0][c] === 0);
+    if (row !== -1) board[row][col] = player;
   }
 
   function copyBoard(b) {
     return b.map(row => [...row]);
   }
 
-  function isWin(tempBoard, player) {
+  function getValidLocations(b) {
+    return [...Array(COLS).keys()].filter(c => b[0][c] === 0);
+  }
+
+  function isWinningMove(b, player) {
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS - 3; c++) {
-        if (tempBoard[r][c] === player &&
-            tempBoard[r][c + 1] === player &&
-            tempBoard[r][c + 2] === player &&
-            tempBoard[r][c + 3] === player) return true;
+        if ([0, 1, 2, 3].every(i => b[r][c + i] === player)) return true;
       }
     }
     for (let c = 0; c < COLS; c++) {
       for (let r = 0; r < ROWS - 3; r++) {
-        if (tempBoard[r][c] === player &&
-            tempBoard[r + 1][c] === player &&
-            tempBoard[r + 2][c] === player &&
-            tempBoard[r + 3][c] === player) return true;
+        if ([0, 1, 2, 3].every(i => b[r + i][c] === player)) return true;
       }
     }
     for (let r = 0; r < ROWS - 3; r++) {
       for (let c = 0; c < COLS - 3; c++) {
-        if (tempBoard[r][c] === player &&
-            tempBoard[r + 1][c + 1] === player &&
-            tempBoard[r + 2][c + 2] === player &&
-            tempBoard[r + 3][c + 3] === player) return true;
+        if ([0, 1, 2, 3].every(i => b[r + i][c + i] === player)) return true;
       }
     }
     for (let r = 3; r < ROWS; r++) {
       for (let c = 0; c < COLS - 3; c++) {
-        if (tempBoard[r][c] === player &&
-            tempBoard[r - 1][c + 1] === player &&
-            tempBoard[r - 2][c + 2] === player &&
-            tempBoard[r - 3][c + 3] === player) return true;
+        if ([0, 1, 2, 3].every(i => b[r - i][c + i] === player)) return true;
       }
     }
     return false;
   }
 
-  function scoreBoard(tempBoard, player) {
-    let score = 0;
+  function scoreBoard(b, player) {
     const center = Math.floor(COLS / 2);
-    const centerCount = tempBoard.map(row => row[center]).filter(v => v === player).length;
-    score += centerCount * 3;
-    return score;
+    const centerCount = b.map(row => row[center]).filter(v => v === player).length;
+    return centerCount * 3;
   }
 
-  function minimax(tempBoard, depth, alpha, beta, maximizing) {
-    const validLocations = getValidLocations();
-    const isTerminal = isWin(tempBoard, AI) || isWin(tempBoard, 1) || validLocations.length === 0;
+  function minimax(b, depth, alpha, beta, maximizing) {
+    const validLocations = getValidLocations(b);
+    const isTerminal = isWinningMove(b, AI) || isWinningMove(b, PLAYER) || validLocations.length === 0;
+
     if (depth === 0 || isTerminal) {
-      if (isWin(tempBoard, AI)) return [null, 1000000];
-      if (isWin(tempBoard, 1)) return [null, -1000000];
-      return [null, scoreBoard(tempBoard, AI)];
+      if (isWinningMove(b, AI)) return [null, 100000];
+      if (isWinningMove(b, PLAYER)) return [null, -100000];
+      return [null, scoreBoard(b, AI)];
     }
 
+    let bestCol = validLocations[Math.floor(Math.random() * validLocations.length)];
+
     if (maximizing) {
-      let value = -Infinity, bestCol = validLocations[0];
-      for (let col of validLocations) {
+      let value = -Infinity;
+      for (const col of validLocations) {
         const row = getAvailableRow(col);
-        const newBoard = copyBoard(tempBoard);
-        newBoard[row][col] = AI;
-        const [, newScore] = minimax(newBoard, depth - 1, alpha, beta, false);
-        if (newScore > value) {
-          value = newScore;
+        const temp = copyBoard(b);
+        temp[row][col] = AI;
+        const [, score] = minimax(temp, depth - 1, alpha, beta, false);
+        if (score > value) {
+          value = score;
           bestCol = col;
         }
         alpha = Math.max(alpha, value);
@@ -147,14 +144,14 @@
       }
       return [bestCol, value];
     } else {
-      let value = Infinity, bestCol = validLocations[0];
-      for (let col of validLocations) {
+      let value = Infinity;
+      for (const col of validLocations) {
         const row = getAvailableRow(col);
-        const newBoard = copyBoard(tempBoard);
-        newBoard[row][col] = 1; // simulate player
-        const [, newScore] = minimax(newBoard, depth - 1, alpha, beta, true);
-        if (newScore < value) {
-          value = newScore;
+        const temp = copyBoard(b);
+        temp[row][col] = PLAYER;
+        const [, score] = minimax(temp, depth - 1, alpha, beta, true);
+        if (score < value) {
+          value = score;
           bestCol = col;
         }
         beta = Math.min(beta, value);
@@ -165,8 +162,32 @@
   }
 
   function getBestMove() {
-    const [col] = minimax(copyBoard(board), 4, -Infinity, Infinity, true);
+    const [col] = minimax(copyBoard(board), 4, -Infinity, Infinity, currentTurn === AI);
     return col;
+  }
+
+  async function playLoop() {
+    while (true) {
+      await new Promise(resolve => setTimeout(resolve, 400));
+      const winner = isWinningMove(board, AI) ? AI :
+                     isWinningMove(board, PLAYER) ? PLAYER : null;
+      if (winner) {
+        resultDiv.textContent = (winner === AI ? "✅ AI 赢了！" : "🎮 玩家赢了！");
+        return;
+      }
+      if (getValidLocations(board).length === 0) {
+        resultDiv.textContent = "😐 平局。";
+        return;
+      }
+      const col = getBestMove();
+      if (col === null) {
+        resultDiv.textContent = "❌ 无法继续落子。";
+        return;
+      }
+      placePiece(col, currentTurn);
+      renderBoard();
+      currentTurn = currentTurn === AI ? PLAYER : AI;
+    }
   }
 
   renderBoard();
