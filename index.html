@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Connect Four AI</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f0f0f0;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(7, 60px);
+      grid-template-rows: repeat(6, 60px);
+      gap: 5px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .cell {
+      width: 60px;
+      height: 60px;
+      background-color: #ffffff;
+      border: 2px solid #000000;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .player {
+      background-color: #ff0000;
+    }
+    .ai {
+      background-color: #ffff00;
+    }
+    #message {
+      margin-top: 20px;
+      font-size: 1.2em;
+    }
+    #reset {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Connect Four AI</h1>
+  <div id="board"></div>
+  <div id="message"></div>
+  <button id="reset">重新开始</button>
+
+  <script>
+    const ROWS = 6;
+    const COLS = 7;
+    const PLAYER = 1;
+    const AI = 2;
+    let board = [];
+    let gameOver = false;
+
+    const boardDiv = document.getElementById('board');
+    const messageDiv = document.getElementById('message');
+    const resetButton = document.getElementById('reset');
+
+    function createBoard() {
+      board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      boardDiv.innerHTML = '';
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = document.createElement('div');
+          cell.classList.add('cell');
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.addEventListener('click', handleClick);
+          boardDiv.appendChild(cell);
+        }
+      }
+      messageDiv.textContent = '您的回合';
+      gameOver = false;
+    }
+
+    function handleClick(e) {
+      if (gameOver) return;
+      const col = parseInt(e.target.dataset.col);
+      const row = getAvailableRow(col);
+      if (row === -1) return;
+      placePiece(row, col, PLAYER);
+      updateUI();
+      if (checkWin(PLAYER)) {
+        messageDiv.textContent = '您赢了！';
+        gameOver = true;
+        return;
+      }
+      if (isBoardFull()) {
+        messageDiv.textContent = '平局！';
+        gameOver = true;
+        return;
+      }
+      messageDiv.textContent = 'AI 思考中...';
+      setTimeout(() => {
+        const aiMove = getBestMove();
+        if (aiMove !== null) {
+          const aiRow = getAvailableRow(aiMove);
+          placePiece(aiRow, aiMove, AI);
+          updateUI();
+          if (checkWin(AI)) {
+            messageDiv.textContent = 'AI 赢了！';
+            gameOver = true;
+            return;
+          }
+          if (isBoardFull()) {
+            messageDiv.textContent = '平局！';
+            gameOver = true;
+            return;
+          }
+          messageDiv.textContent = '您的回合';
+        }
+      }, 500);
+    }
+
+    function getAvailableRow(col) {
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (board[r][col] === 0) return r;
+      }
+      return -1;
+    }
+
+    function placePiece(row, col, player) {
+      board[row][col] = player;
+    }
+
+    function updateUI() {
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = boardDiv.children[r * COLS + c];
+          cell.classList.remove('player', 'ai');
+          if (board[r][c] === PLAYER) {
+            cell.classList.add('player');
+          } else if (board[r][c] === AI) {
+            cell.classList.add('ai');
+          }
+        }
+      }
+    }
+
+    function checkWin(player) {
+      // 水平
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+          if (
+            board[r][c] === player &&
+            board[r][c + 1] === player &&
+            board[r][c + 2] === player &&
+            board[r][c + 3] === player
+          ) {
+            return true;
+          }
+        }
+      }
+      // 垂直
+      for (let c = 0; c < COLS; c++) {
+        for (let r = 0; r < ROWS - 3; r++) {
+          if (
+            board[r][c] === player &&
+            board[r + 1][c] === player &&
+            board[r + 2][c] === player &&
+            board[r + 3][c] === player
+          ) {
+            return true;
+          }
+        }
+      }
+      // 正斜线
+      for (let r = 0; r < ROWS - 3; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+          if (
+            board[r][c] === player &&
+            board[r + 1][c + 1] === player &&
+            board[r + 2][c + 2] === player &&
+            board[r + 3][c + 3] === player
+          ) {
+            return true;
+          }
+        }
+      }
+      // 反斜线
+      for (let r = 3; r < ROWS; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+          if (
+            board[r][c] === player &&
+            board[r - 1][c + 1] === player &&
+            board[r - 2][c + 2] === player &&
+            board[r - 3][c + 3] === player
+          ) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function isBoardFull() {
+      for (let c = 0; c < COLS; c++) {
+        if (board[0][c] === 0) return false;
+      }
+      return true;
+    }
+
+    function getValidLocations() {
+      const validLocations = [];
+      for (let c = 0; c < COLS; c++) {
+        if (board[0][c] === 0) validLocations.push(c);
+      }
+      return validLocations;
+    }
+
+    function copyBoard(board) {
+      return board.map(row => row.slice());
+    }
+
+    function scorePosition(tempBoard, player) {
+      let score = 0;
+      // 中间列优先
+      const centerArray = tempBoard.map(row => row[Math.floor(COLS / 2)]);
+      const centerCount = centerArray.filter(val => val === player).length;
+      score += centerCount * 3;
+      return score;
+    }
+
+    function isTerminalNode(tempBoard) {
+      return checkWin(PLAYER) || checkWin(AI) || getValidLocations().length === 0;
+    }
+
+    function minimax(tempBoard, depth, alpha, beta, maximizingPlayer) {
+      const validLocations = getValidLocations();
+      const isTerminal = isTerminalNode(tempBoard);
+      if (depth === 0 || isTerminal) {
+        if (isTerminal) {
+          if (checkWin(AI)) {
+            return [null, 100000000000000];
+          } else if (checkWin(PLAYER)) {
+            return [null, -100000000000000];
+          } else {
+            return [null, 0];
+          }
+        } else {
+          return [null, scorePosition(tempBoard, AI)];
+        }
+      }
+
+      if (maximizingPlayer) {
+        let value = -Infinity;
+        let column = validLocations[Math.floor(Math.random() * validLocations.length)];
+        for (let col of validLocations) {
+          const row = getAvailableRow(col);
+          const newBoard = copyBoard(tempBoard);
+          newBoard[row][col] = AI;
+          const newScore = minimax(newBoard, depth - 1, alpha, beta, false)[1];
+          if (newScore > value) {
+            value = newScore;
+            column = col;
+          }
+          alpha = Math.max(alpha, value);
+          if (alpha >= beta) break;
+        }
+        return [column, value];
+      } else {
+        let value = Infinity;
+        let column = validLocations[Math.floor(Math.random() * validLocations.length)];
+        for (let col of validLocations) {
+          const row = getAvailableRow(col);
+          const newBoard = copyBoard(tempBoard);
+          newBoard[row][col] = PLAYER;
+          const newScore = minimax(newBoard, depth - 1, alpha, beta, true)[1];
+          if (newScore < value) {
+            value = newScore;
+            column = col;
+          }
+          beta = Math.min(beta, value);
+          if (alpha >= beta
+::contentReference[oaicite:29]{index=29}
+ 
